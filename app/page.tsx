@@ -30,35 +30,38 @@ export default function Home() {
 
   // 검색 함수 (대학 필수 / 학과 선택)
   const search = useCallback(async (university: string, department: string) => {
-    if (!university) return;
+  if (!university) return;
 
-    setLoading(true);
+  setLoading(true);
 
-    let query = supabase
-      .from('applications')
-      .select('*')
-      .eq('대학', university);
+  // ✅ 재할당 없이 삼항연산자로 분기 → 타입 에러 없음
+  const { data } = await (
+    department
+      ? supabase
+          .from('applications')
+          .select('*')
+          .eq('대학', university)
+          .eq('학과', department)
+          .order('백분위합', { ascending: false })
+      : supabase
+          .from('applications')
+          .select('*')
+          .eq('대학', university)
+          .order('백분위합', { ascending: false })
+  );
 
-    // ✅ 학과가 선택된 경우에만 필터 추가 (대학만 선택 시 전체 학과 조회)
-    if (department) {
-      query = query.eq('학과', department);
-    }
+  if (data) {
+    const typed = data as Application[];
+    setResults(typed);
+    setStats({
+      total: typed.length,
+      passed: typed.filter((d) => d.합불 === '합격').length,
+      failed: typed.filter((d) => d.합불 === '불합격').length,
+    });
+  }
+  setLoading(false);
+}, []);
 
-    query = query.order('백분위합', { ascending: false });
-
-    const { data } = await query;
-
-    if (data) {
-      const typed = data as Application[];
-      setResults(typed);
-      setStats({
-        total: typed.length,
-        passed: typed.filter((d) => d.합불 === '합격').length,
-        failed: typed.filter((d) => d.합불 === '불합격').length,
-      });
-    }
-    setLoading(false);
-  }, []);
 
   // 대학 선택 핸들러
   const handleUniversityChange = async (university: string) => {
