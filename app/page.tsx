@@ -84,7 +84,7 @@ export default function Home() {
       .select("대학")
       .then(({ data }) => {
         if (!data) return;
-        const list = [...new Set(data.map((r: Application) => r.대학).filter(Boolean))] as string[];
+        const list = [...new Set(data.map((r: unknown) => (r as Application).대학).filter(Boolean))] as string[];
         setUniversities(list.sort());
       });
   }, []);
@@ -100,7 +100,7 @@ export default function Home() {
       .eq("대학", selectedUniv)
       .then(({ data }) => {
         if (!data) return;
-        const list = [...new Set(data.map((r: Application) => r.학과).filter(Boolean))] as string[];
+        const list = [...new Set(data.map((r: unknown) => (r as Application).학과).filter(Boolean))] as string[];
         setDepartments(list.sort());
         setMessage("학과를 선택해 주세요.");
       });
