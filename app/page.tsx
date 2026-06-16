@@ -150,7 +150,7 @@ export default function Home() {
         {loading ? (
           <div className="text-center py-16 text-gray-400 text-sm">불러오는 중...</div>
         ) : results.length > 0 ? (
-          <div className="flex gap-4">
+          <div className="flex flex-col md:flex-row gap-4">
             {/* 합격 */}
             <div className="flex-1 bg-white border border-blue-200 rounded-lg overflow-x-auto">
               <div className="px-4 py-2 bg-blue-50 border-b border-blue-200 font-semibold text-blue-700 text-sm">
