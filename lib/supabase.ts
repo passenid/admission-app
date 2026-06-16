@@ -1,13 +1,7 @@
-import { createClient } from "@supabase/supabase-js";
+import { createClient } from '@supabase/supabase-js';
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-const supabasePublishableKey =
-  process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY;
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
+const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
 
-export const hasSupabaseEnv = Boolean(
-  supabaseUrl && supabasePublishableKey,
-);
-
-export const supabase = hasSupabaseEnv
-  ? createClient(supabaseUrl as string, supabasePublishableKey as string)
-  : null;
+// ✅ ! 단언으로 null 가능성 제거
+export const supabase = createClient(supabaseUrl, supabaseAnonKey);
