@@ -1,0 +1,21 @@
+export type Application = {
+  id: string | number;
+  연도?: string | number | null;
+  군?: string | null;
+  대학?: string | null;
+  학과?: string | null;
+  합불?: string | null;
+  내신?: string | number | null;
+  국어선택?: string | null;
+  국어백분위?: string | number | null;
+  수학선택?: string | null;
+  수학백분위?: string | number | null;
+  탐구1과목?: string | null;
+  탐구1백분위?: string | number | null;
+  탐구2과목?: string | null;
+  탐구2백분위?: string | number | null;
+  영어등급?: string | null;
+  한국사등급?: string | null;
+  백분위합?: string | number | null;
+  표준점수합?: string | number | null;
+};
