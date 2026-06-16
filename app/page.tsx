@@ -86,11 +86,12 @@ export default function Home() {
     const { data } = await supabase
       .from('applications')
       .select('*')
-      .gte('백분위합', val - range)
-      .lte('백분위합', val + range)
       .order('백분위합', { ascending: false });
     if (data) {
-      const typed = data as Application[];
+      const typed = (data as Application[]).filter((r) => {
+        const p = Number(r.백분위합);
+        return !isNaN(p) && p >= val - range && p <= val + range;
+      });
       setPercentileResults(typed);
       setPercentileStats({
         total: typed.length,
