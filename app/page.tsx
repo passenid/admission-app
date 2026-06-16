@@ -38,8 +38,8 @@ export default function Home() {
       setResults(typed);
       setStats({
         total: typed.length,
-        passed: typed.filter((d) => d.합불 === '합격').length,
-        failed: typed.filter((d) => d.합불 === '불합격').length,
+        passed: typed.filter((d) => d.합불 === 'O').length,
+        failed: typed.filter((d) => d.합불 === 'X').length,
       });
     }
     setLoading(false);
@@ -158,7 +158,7 @@ export default function Home() {
               </div>
               <table className="min-w-full text-sm">
                 <thead>{columns}</thead>
-                <tbody>{renderRows('합격', 'hover:bg-blue-50')}</tbody>
+                <tbody>{renderRows('O', 'hover:bg-blue-50')}</tbody>
               </table>
             </div>
             {/* 불합격 */}
@@ -168,7 +168,7 @@ export default function Home() {
               </div>
               <table className="min-w-full text-sm">
                 <thead>{columns}</thead>
-                <tbody>{renderRows('불합격', 'hover:bg-red-50')}</tbody>
+                <tbody>{renderRows('X', 'hover:bg-red-50')}</tbody>
               </table>
             </div>
           </div>
