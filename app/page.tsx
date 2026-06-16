@@ -15,18 +15,20 @@ export default function Home() {
 
   // 마운트 시 대학 목록 로드
   useEffect(() => {
-    const fetchUniversities = async () => {
-      const { data } = await supabase
-        .from('applications')
-        .select('대학')
-        .order('대학');
-      if (data) {
-        const unique = [...new Set(data.map((d) => d.대학 as string))].sort();
-        setUniversities(unique);
-      }
-    };
-    fetchUniversities();
-  }, []);
+  const fetchUniversities = async () => {
+    const { data } = await supabase
+      .from('applications')
+      .select('대학')
+      .order('대학');
+    if (data) {
+      // ✅ (data as any[])로 캐스팅 후 브라켓 표기법 사용
+      const unique = [...new Set((data as any[]).map((d) => d['대학'] as string))].sort();
+      setUniversities(unique);
+    }
+  };
+  fetchUniversities();
+}, []);
+
 
   // 검색 함수 (대학 필수 / 학과 선택)
   const search = useCallback(async (university: string, department: string) => {
@@ -77,15 +79,17 @@ export default function Home() {
 
     // 학과 목록 로드
     const { data } = await supabase
-      .from('applications')
-      .select('학과')
-      .eq('대학', university)
-      .order('학과');
+  .from('applications')
+  .select('학과')
+  .eq('대학', university)
+  .order('학과');
 
-    if (data) {
-      const unique = [...new Set(data.map((d) => d.학과 as string))].sort();
-      setDepartments(unique);
-    }
+if (data) {
+  // ✅ 동일하게 캐스팅
+  const unique = [...new Set((data as any[]).map((d) => d['학과'] as string))].sort();
+  setDepartments(unique);
+}
+
 
     // ✅ 대학만 선택해도 즉시 전체 학과 조회
     await search(university, '');
