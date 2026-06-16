@@ -18,7 +18,7 @@ export default function Home() {
     const fetchUniversities = async () => {
       const { data } = await supabase.from('applications').select('대학').order('대학');
       if (data) {
-        const unique = [...new Set((data as any[]).map((d) => d['대학'] as string))].sort();
+        const unique = [...new Set((data as any[]).map((d) => d['대학'] as string))].filter((u) => u && u.trim() !== '').sort();
         setUniversities(unique);
       }
     };
