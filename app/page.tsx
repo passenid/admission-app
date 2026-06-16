@@ -1,198 +1,252 @@
-"use client";
+'use client';
 
-import { useEffect, useMemo, useState } from "react";
-import { hasSupabaseEnv, supabase } from "@/lib/supabase";
-import type { Application } from "@/types/application";
-
-function isAccepted(app: Application) {
-  const v = app.합불?.trim() ?? "";
-  return v === "O" || v === "o" || v === "합격";
-}
-
-function isRejected(app: Application) {
-  const v = app.합불?.trim() ?? "";
-  return v === "X" || v === "x" || v === "불합격";
-}
-
-function ApplicationList({
-  title,
-  emptyText,
-  items,
-}: {
-  title: string;
-  emptyText: string;
-  items: Application[];
-}) {
-  return (
-    <section className="rounded border border-slate-200 bg-white p-5">
-      <h2 className="text-lg font-semibold text-slate-900 mb-4">{title}</h2>
-      {items.length === 0 ? (
-        <p className="text-sm text-slate-500">{emptyText}</p>
-      ) : (
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm border-collapse">
-            <thead>
-              <tr className="bg-slate-100 text-slate-600">
-                <th className="px-3 py-2 text-left font-medium border border-slate-200">군</th>
-                <th className="px-3 py-2 text-left font-medium border border-slate-200">대학</th>
-                <th className="px-3 py-2 text-left font-medium border border-slate-200">학과</th>
-                <th className="px-3 py-2 text-center font-medium border border-slate-200">합불</th>
-                <th className="px-3 py-2 text-right font-medium border border-slate-200">내신</th>
-                <th className="px-3 py-2 text-right font-medium border border-slate-200">백분위합</th>
-                <th className="px-3 py-2 text-right font-medium border border-slate-200">표준점수합</th>
-                <th className="px-3 py-2 text-center font-medium border border-slate-200">영어등급</th>
-              </tr>
-            </thead>
-            <tbody>
-              {items.map((item) => (
-                <tr key={item.id} className="hover:bg-slate-50">
-                  <td className="px-3 py-2 border border-slate-200 text-slate-700">{item.군 ?? "-"}</td>
-                  <td className="px-3 py-2 border border-slate-200 font-medium text-slate-900">{item.대학 ?? "-"}</td>
-                  <td className="px-3 py-2 border border-slate-200 text-slate-700">{item.학과 ?? "-"}</td>
-                  <td className="px-3 py-2 border border-slate-200 text-center font-bold">
-                    <span className={isAccepted(item) ? "text-emerald-600" : "text-rose-600"}>
-                      {item.합불 ?? "-"}
-                    </span>
-                  </td>
-                  <td className="px-3 py-2 border border-slate-200 text-right text-slate-700">{item.내신 ?? "-"}</td>
-                  <td className="px-3 py-2 border border-slate-200 text-right text-slate-700">{item.백분위합 ?? "-"}</td>
-                  <td className="px-3 py-2 border border-slate-200 text-right text-slate-700">{item.표준점수합 ?? "-"}</td>
-                  <td className="px-3 py-2 border border-slate-200 text-center text-slate-700">{item.영어등급 ?? "-"}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      )}
-    </section>
-  );
-}
+import { useState, useEffect, useCallback } from 'react';
+import { supabase } from '@/lib/supabase';
+import { Application } from '@/types/application';
 
 export default function Home() {
   const [universities, setUniversities] = useState<string[]>([]);
-  const [selectedUniv, setSelectedUniv] = useState("");
   const [departments, setDepartments] = useState<string[]>([]);
-  const [selectedDept, setSelectedDept] = useState("");
-  const [applications, setApplications] = useState<Application[]>([]);
-  const [isLoading, setIsLoading] = useState(false);
-  const [message, setMessage] = useState("대학을 선택해 주세요.");
+  const [selectedUniversity, setSelectedUniversity] = useState('');
+  const [selectedDepartment, setSelectedDepartment] = useState('');
+  const [results, setResults] = useState<Application[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [stats, setStats] = useState({ total: 0, passed: 0, failed: 0 });
 
+  // 마운트 시 대학 목록 로드
   useEffect(() => {
-    if (!hasSupabaseEnv || !supabase) return;
-    supabase
-      .from("applications")
-      .select("대학")
-      .then(({ data }) => {
-        if (!data) return;
-        const list = [...new Set(data.map((r: unknown) => (r as Application).대학).filter(Boolean))] as string[];
-        setUniversities(list.sort());
-      });
+    const fetchUniversities = async () => {
+      const { data } = await supabase
+        .from('applications')
+        .select('대학')
+        .order('대학');
+      if (data) {
+        const unique = [...new Set(data.map((d) => d.대학 as string))].sort();
+        setUniversities(unique);
+      }
+    };
+    fetchUniversities();
   }, []);
 
-  useEffect(() => {
-    setSelectedDept("");
+  // 검색 함수 (대학 필수 / 학과 선택)
+  const search = useCallback(async (university: string, department: string) => {
+    if (!university) return;
+
+    setLoading(true);
+
+    let query = supabase
+      .from('applications')
+      .select('*')
+      .eq('대학', university);
+
+    // ✅ 학과가 선택된 경우에만 필터 추가 (대학만 선택 시 전체 학과 조회)
+    if (department) {
+      query = query.eq('학과', department);
+    }
+
+    query = query.order('백분위합', { ascending: false });
+
+    const { data } = await query;
+
+    if (data) {
+      const typed = data as Application[];
+      setResults(typed);
+      setStats({
+        total: typed.length,
+        passed: typed.filter((d) => d.합불 === '합격').length,
+        failed: typed.filter((d) => d.합불 === '불합격').length,
+      });
+    }
+    setLoading(false);
+  }, []);
+
+  // 대학 선택 핸들러
+  const handleUniversityChange = async (university: string) => {
+    setSelectedUniversity(university);
+    setSelectedDepartment('');
     setDepartments([]);
-    setApplications([]);
-    if (!selectedUniv || !supabase) return;
-    supabase
-      .from("applications")
-      .select("학과")
-      .eq("대학", selectedUniv)
-      .then(({ data }) => {
-        if (!data) return;
-        const list = [...new Set(data.map((r: unknown) => (r as Application).학과).filter(Boolean))] as string[];
-        setDepartments(list.sort());
-        setMessage("학과를 선택해 주세요.");
-      });
-  }, [selectedUniv]);
 
-  useEffect(() => {
-    if (!selectedUniv || !selectedDept || !supabase) return;
-    setIsLoading(true);
-    setMessage("검색 중입니다.");
-    supabase
-      .from("applications")
-      .select("*")
-      .eq("대학", selectedUniv)
-      .eq("학과", selectedDept)
-      .order("id", { ascending: false })
-      .then(({ data, error }) => {
-        setIsLoading(false);
-        if (error) {
-          setMessage(`오류: ${error.message}`);
-          return;
-        }
-        const list = (data ?? []) as Application[];
-        setApplications(list);
-        setMessage(list.length > 0 ? "검색 결과를 확인해 주세요." : "검색 결과가 없습니다.");
-      });
-  }, [selectedDept]);
+    if (!university) {
+      setResults([]);
+      setStats({ total: 0, passed: 0, failed: 0 });
+      return;
+    }
 
-  const acceptedApplications = useMemo(() => applications.filter(isAccepted), [applications]);
-  const rejectedApplications = useMemo(() => applications.filter(isRejected), [applications]);
+    // 학과 목록 로드
+    const { data } = await supabase
+      .from('applications')
+      .select('학과')
+      .eq('대학', university)
+      .order('학과');
+
+    if (data) {
+      const unique = [...new Set(data.map((d) => d.학과 as string))].sort();
+      setDepartments(unique);
+    }
+
+    // ✅ 대학만 선택해도 즉시 전체 학과 조회
+    await search(university, '');
+  };
+
+  // 학과 선택 핸들러
+  const handleDepartmentChange = async (department: string) => {
+    setSelectedDepartment(department);
+    await search(selectedUniversity, department);
+  };
 
   return (
-    <main className="min-h-screen px-4 py-8 sm:px-6 lg:px-8">
-      <div className="mx-auto max-w-5xl">
-        <header className="mb-8">
-          <h1 className="text-3xl font-bold text-slate-950">대입 정시지원 상담 웹앱</h1>
-          <p className="mt-2 text-slate-600">본교 졸업생의 정시 지원 사례를 대학명과 학과명으로 검색합니다.</p>
-        </header>
+    <main className="min-h-screen bg-gray-50 p-6">
+      <div className="max-w-[1400px] mx-auto">
+        <h1 className="text-2xl font-bold text-gray-900 mb-6">
+          대입 정시지원 상담
+        </h1>
 
-        <div className="rounded border border-slate-200 bg-white p-5">
-          <div className="grid gap-4 md:grid-cols-2">
-            <label className="block">
-              <span className="text-sm font-medium text-slate-700">대학명</span>
-              <select
-                value={selectedUniv}
-                onChange={(e) => setSelectedUniv(e.target.value)}
-                className="mt-2 h-11 w-full rounded border border-slate-300 px-3 text-slate-900 outline-none focus:border-slate-900"
-              >
-                <option value="">대학을 선택하세요</option>
-                {universities.map((u) => (
-                  <option key={u} value={u}>{u}</option>
-                ))}
-              </select>
+        {/* 검색 영역 */}
+        <div className="bg-white rounded-lg border border-gray-200 p-4 mb-4 flex flex-wrap gap-4">
+          {/* 대학 선택 */}
+          <div className="flex-1 min-w-[200px]">
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              대학
             </label>
+            <select
+              className="w-full border border-gray-300 rounded px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              value={selectedUniversity}
+              onChange={(e) => handleUniversityChange(e.target.value)}
+            >
+              <option value="">대학 선택</option>
+              {universities.map((u) => (
+                <option key={u} value={u}>{u}</option>
+              ))}
+            </select>
+          </div>
 
-            <label className="block">
-              <span className="text-sm font-medium text-slate-700">학과명</span>
-              <select
-                value={selectedDept}
-                onChange={(e) => setSelectedDept(e.target.value)}
-                disabled={departments.length === 0}
-                className="mt-2 h-11 w-full rounded border border-slate-300 px-3 text-slate-900 outline-none focus:border-slate-900 disabled:bg-slate-100"
-              >
-                <option value="">학과를 선택하세요</option>
-                {departments.map((d) => (
-                  <option key={d} value={d}>{d}</option>
-                ))}
-              </select>
+          {/* 학과 선택 */}
+          <div className="flex-1 min-w-[200px]">
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              학과{' '}
+              <span className="font-normal text-gray-400">
+                (선택 안 하면 전체 학과 조회)
+              </span>
             </label>
+            <select
+              className="w-full border border-gray-300 rounded px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100 disabled:cursor-not-allowed"
+              value={selectedDepartment}
+              onChange={(e) => handleDepartmentChange(e.target.value)}
+              disabled={!selectedUniversity}
+            >
+              <option value="">전체 학과</option>
+              {departments.map((d) => (
+                <option key={d} value={d}>{d}</option>
+              ))}
+            </select>
           </div>
         </div>
 
-        <p className="mt-4 text-sm text-slate-600">{isLoading ? "검색 중..." : message}</p>
+        {/* 통계 카드 */}
+        {selectedUniversity && !loading && (
+          <div className="flex gap-3 mb-4">
+            <div className="bg-white border border-gray-200 rounded px-4 py-2 text-sm">
+              <span className="text-gray-500">전체</span>
+              <span className="ml-2 font-bold text-gray-900">{stats.total}건</span>
+            </div>
+            <div className="bg-white border border-blue-200 rounded px-4 py-2 text-sm">
+              <span className="text-blue-600">합격</span>
+              <span className="ml-2 font-bold text-blue-700">{stats.passed}건</span>
+            </div>
+            <div className="bg-white border border-red-200 rounded px-4 py-2 text-sm">
+              <span className="text-red-500">불합격</span>
+              <span className="ml-2 font-bold text-red-600">{stats.failed}건</span>
+            </div>
+          </div>
+        )}
 
-        <section className="mt-6 grid gap-4 md:grid-cols-3">
-          <div className="rounded border border-slate-200 bg-white p-5">
-            <p className="text-sm font-medium text-slate-500">지원 건수</p>
-            <p className="mt-2 text-3xl font-bold text-slate-950">{applications.length}</p>
+        {/* 결과 테이블 */}
+        {loading ? (
+          <div className="text-center py-16 text-gray-400 text-sm">
+            불러오는 중...
           </div>
-          <div className="rounded border border-slate-200 bg-white p-5">
-            <p className="text-sm font-medium text-slate-500">합격 건수</p>
-            <p className="mt-2 text-3xl font-bold text-emerald-700">{acceptedApplications.length}</p>
+        ) : results.length > 0 ? (
+          <div className="bg-white border border-gray-200 rounded-lg overflow-x-auto">
+            <table className="min-w-full text-sm">
+              <thead>
+                <tr className="bg-gray-50 border-b border-gray-200">
+                  {/* 기본 정보 */}
+                  <th className="px-3 py-2.5 text-left font-medium text-gray-600 whitespace-nowrap">연도</th>
+                  <th className="px-3 py-2.5 text-left font-medium text-gray-600 whitespace-nowrap">군</th>
+                  <th className="px-3 py-2.5 text-left font-medium text-gray-600 whitespace-nowrap">대학</th>
+                  <th className="px-3 py-2.5 text-left font-medium text-gray-600 whitespace-nowrap">학과</th>
+                  <th className="px-3 py-2.5 text-center font-medium text-gray-600 whitespace-nowrap">합불</th>
+                  <th className="px-3 py-2.5 text-right font-medium text-gray-600 whitespace-nowrap">내신</th>
+                  {/* ✅ 국어 상세 */}
+                  <th className="px-3 py-2.5 text-center font-medium text-blue-600 whitespace-nowrap border-l border-gray-200">국어선택</th>
+                  <th className="px-3 py-2.5 text-right font-medium text-blue-600 whitespace-nowrap">국어백분위</th>
+                  {/* ✅ 수학 상세 */}
+                  <th className="px-3 py-2.5 text-center font-medium text-blue-600 whitespace-nowrap border-l border-gray-200">수학선택</th>
+                  <th className="px-3 py-2.5 text-right font-medium text-blue-600 whitespace-nowrap">수학백분위</th>
+                  {/* ✅ 탐구 상세 */}
+                  <th className="px-3 py-2.5 text-center font-medium text-blue-600 whitespace-nowrap border-l border-gray-200">탐구1과목</th>
+                  <th className="px-3 py-2.5 text-right font-medium text-blue-600 whitespace-nowrap">탐구1백분위</th>
+                  <th className="px-3 py-2.5 text-center font-medium text-blue-600 whitespace-nowrap">탐구2과목</th>
+                  <th className="px-3 py-2.5 text-right font-medium text-blue-600 whitespace-nowrap">탐구2백분위</th>
+                  {/* 기타 */}
+                  <th className="px-3 py-2.5 text-right font-medium text-gray-600 whitespace-nowrap border-l border-gray-200">영어등급</th>
+                  <th className="px-3 py-2.5 text-right font-medium text-gray-600 whitespace-nowrap">한국사등급</th>
+                  <th className="px-3 py-2.5 text-right font-medium text-gray-600 whitespace-nowrap">백분위합</th>
+                  <th className="px-3 py-2.5 text-right font-medium text-gray-600 whitespace-nowrap">표준점수합</th>
+                </tr>
+              </thead>
+              <tbody>
+                {results.map((row) => (
+                  <tr
+                    key={row.id}
+                    className="border-b border-gray-100 hover:bg-gray-50 transition-colors"
+                  >
+                    <td className="px-3 py-2 whitespace-nowrap text-gray-500">{row.연도}</td>
+                    <td className="px-3 py-2 whitespace-nowrap">{row.군}</td>
+                    <td className="px-3 py-2 whitespace-nowrap font-medium">{row.대학}</td>
+                    <td className="px-3 py-2 whitespace-nowrap">{row.학과}</td>
+                    <td className="px-3 py-2 whitespace-nowrap text-center">
+                      <span
+                        className={`inline-block px-2 py-0.5 rounded text-xs font-medium ${
+                          row.합불 === '합격'
+                            ? 'bg-blue-50 text-blue-700'
+                            : 'bg-red-50 text-red-700'
+                        }`}
+                      >
+                        {row.합불}
+                      </span>
+                    </td>
+                    <td className="px-3 py-2 text-right whitespace-nowrap">{row.내신 ?? '-'}</td>
+                    {/* 국어 */}
+                    <td className="px-3 py-2 text-center whitespace-nowrap border-l border-gray-100">{row.국어선택 ?? '-'}</td>
+                    <td className="px-3 py-2 text-right whitespace-nowrap">{row.국어백분위 ?? '-'}</td>
+                    {/* 수학 */}
+                    <td className="px-3 py-2 text-center whitespace-nowrap border-l border-gray-100">{row.수학선택 ?? '-'}</td>
+                    <td className="px-3 py-2 text-right whitespace-nowrap">{row.수학백분위 ?? '-'}</td>
+                    {/* 탐구 */}
+                    <td className="px-3 py-2 text-center whitespace-nowrap border-l border-gray-100">{row.탐구1과목 ?? '-'}</td>
+                    <td className="px-3 py-2 text-right whitespace-nowrap">{row.탐구1백분위 ?? '-'}</td>
+                    <td className="px-3 py-2 text-center whitespace-nowrap">{row.탐구2과목 ?? '-'}</td>
+                    <td className="px-3 py-2 text-right whitespace-nowrap">{row.탐구2백분위 ?? '-'}</td>
+                    {/* 기타 */}
+                    <td className="px-3 py-2 text-right whitespace-nowrap border-l border-gray-100">{row.영어등급 ?? '-'}</td>
+                    <td className="px-3 py-2 text-right whitespace-nowrap">{row.한국사등급 ?? '-'}</td>
+                    <td className="px-3 py-2 text-right whitespace-nowrap font-semibold">{row.백분위합 ?? '-'}</td>
+                    <td className="px-3 py-2 text-right whitespace-nowrap font-semibold">{row.표준점수합 ?? '-'}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </div>
-          <div className="rounded border border-slate-200 bg-white p-5">
-            <p className="text-sm font-medium text-slate-500">불합격 건수</p>
-            <p className="mt-2 text-3xl font-bold text-rose-700">{rejectedApplications.length}</p>
+        ) : selectedUniversity ? (
+          <div className="text-center py-16 text-gray-400 text-sm">
+            검색 결과가 없습니다.
           </div>
-        </section>
-
-        <div className="mt-6 grid gap-4 lg:grid-cols-2">
-          <ApplicationList title="합격 사례 목록" emptyText="합격 사례가 없습니다." items={acceptedApplications} />
-          <ApplicationList title="불합격 사례 목록" emptyText="불합격 사례가 없습니다." items={rejectedApplications} />
-        </div>
+        ) : (
+          <div className="text-center py-16 text-gray-400 text-sm">
+            대학을 선택하면 결과가 표시됩니다.
+          </div>
+        )}
       </div>
     </main>
   );
